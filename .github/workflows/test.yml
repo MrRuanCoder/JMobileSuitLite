@@ -29,7 +29,24 @@ jobs:
       - name: Merge PR
         run: |
           # GitHub API request to merge the pull request
+          # Add condition to check if tests have passed
+          if [ "$(curl -s -X GET -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" | jq -r '.conclusion')" != "success" ]; then
+            echo "Tests did not pass. PR will not be automatically merged."
+            exit 1
+          fi
+
+          # Add condition to check if there are no conflicts
+          if [ "$(curl -s -X GET -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.after }}" | jq -r '.mergeable')" != "true" ]; then
+            echo "There are conflicts in the PR. PR will not be automatically merged."
+            exit 1
+          fi
+
+          # Perform the merge if conditions are met
           curl -X PUT \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.after }}/merge
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.after }}/merge"
